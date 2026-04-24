@@ -1,0 +1,124 @@
+.container {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-height: 100vh;
+  padding: 24px 16px;
+}
+
+.card {
+  width: 100%;
+  max-width: 400px;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(12px);
+  border-radius: 20px;
+  padding: 32px 24px;
+  box-shadow: 0 8px 32px rgba(0, 60, 40, 0.12);
+}
+
+.header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.brand {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #15804d;
+  letter-spacing: -0.02em;
+}
+
+.lockerId {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #3d5a4e;
+  margin-top: 4px;
+}
+
+.confirmation {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.checkmark {
+  font-size: 2.5rem;
+  color: #27ae60;
+  margin-bottom: 8px;
+}
+
+.title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #2d4a3e;
+}
+
+.pinSection {
+  text-align: center;
+  background: #f0faf4;
+  border: 2px solid #c8e6d8;
+  border-radius: 16px;
+  padding: 24px;
+  margin-bottom: 20px;
+}
+
+.pinLabel {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #6b8f7f;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.pin {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: #15804d;
+  letter-spacing: 0.15em;
+  margin-bottom: 16px;
+}
+
+.times {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.timeRow {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 12px;
+}
+
+.timeLabel {
+  font-size: 0.85rem;
+  color: #6b8f7f;
+  font-weight: 500;
+}
+
+.timeValue {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #2d4a3e;
+}
+
+.pending {
+  text-align: center;
+  padding: 20px;
+  color: #3d5a4e;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.smsNote {
+  text-align: center;
+  font-size: 0.8rem;
+  color: #7a9e8e;
+  margin-top: 16px;
+}
+
+.loading {
+  text-align: center;
+  color: #6b8f7f;
+  padding: 40px 0;
+}

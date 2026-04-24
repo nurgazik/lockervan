@@ -1,0 +1,250 @@
+LockerVan - Smart Locker Rental System
+Product Requirements Document
+Version 3.0 | April 2026
+
+---
+
+1. BUSINESS PROBLEM
+
+Vancouver Island is one of Canada's most visited tourist destinations, attracting hikers, beachgoers, kayakers, and cyclists. Despite high foot traffic at parks, beaches, and sport facilities, there is no modern, self-service locker rental infrastructure on the island.
+
+Visitors are forced to leave valuables in their cars or carry everything with them, reducing enjoyment and creating real security risk. Businesses and venue operators near high-traffic areas miss a simple revenue opportunity.
+
+Target locations (pilot):
+- Public parks and beaches (e.g. Tofino, Parksville, Qualicum Beach)
+- Downtown areas in Victoria and Nanaimo
+- Pickleball and other sport centres
+- Shopping malls
+
+The opportunity: a self-service smart locker rental business that requires no staff, no keys, and no app download. Customers scan a QR code, pay, and receive a time-limited access code via SMS. The system runs automatically 24/7.
+
+---
+
+2. SCOPE AND OWNERSHIP
+
+This PRD covers the software MVP only. The software is being built as a favour for a friend who owns and operates the business.
+
+Software scope (this PRD): booking page, payment integration, code generation, SMS delivery, database, webhook handling.
+
+Partner scope (not covered here): locker cabinet sourcing and installation, battery replacements, cleaning and maintenance, QR code sticker production and replacement, location agreements and permits, insurance and liability, business model and pricing strategy decisions, manual customer support and fallback operations.
+
+---
+
+3. GOALS AND NON-GOALS
+
+Goals for Version 1 (pilot):
+- Validate demand: prove people will pay to rent a locker at target locations
+- Operate with minimal manual intervention after setup
+- Run reliably outdoors with no wifi or cellular dependency at the lock
+- Keep upfront build cost minimal for a pilot-scale deployment
+- Lay a clean technical foundation that can scale to Version 2
+
+Non-goals for Version 1:
+- Native mobile app
+- Multi-language support
+- Membership or loyalty program
+- Real-time occupancy map for customers
+- Advanced analytics dashboard
+- Custom-built operator dashboard (Supabase Table Editor serves this role)
+- Email delivery of PIN codes
+- Automated pricing adjustments
+- Integration with third-party booking platforms
+- Cash payment
+
+---
+
+4. SOLUTION OVERVIEW
+
+LockerVan is a web-based locker rental platform. Each locker has a unique QR code on its door. Customers scan the code with their phone camera, pay via Stripe in a mobile browser, and receive a time-limited PIN code via SMS. No app download required. The PIN is generated using Codelocks NetCode technology and expires automatically when the rental window ends. The lock requires no internet connection.
+
+MVP scope: Version 1 launches at a single pickleball centre. Centre staff hold a master key as a manual fallback for edge cases (expired code, customer support). The system is fully automated for the standard flow but does not need complex exception handling at this stage. Prove demand first, then scale.
+
+---
+
+5. PRICING
+
+1 hour: $1
+3 hours: $3
+5 hours: $5
+
+Rental fee is flat regardless of early return. No partial refunds in Version 1. This keeps payment logic simple and avoids Stripe refund complexity.
+
+Rental timing uses the parking model: the clock starts at the moment of payment. This is communicated clearly to the customer on the confirmation screen.
+
+---
+
+6. CUSTOMER FLOW
+
+Step 1: Customer points phone camera at QR code on locker door. QR encodes a unique absolute URL including the locker ID (e.g. https://lockervan.com/locker/B07), which opens the booking page in the browser.
+
+Step 2: Customer enters their phone number (required, validated on the booking page) and selects rental duration (1 hr / 3 hr / full day). The phone number is collected on the booking page rather than in Stripe Checkout, ensuring it is always present before payment begins.
+
+Step 3: Customer is shown the price and proceeds to Stripe Checkout. Stripe collects payment and email. The phone number is passed to Stripe as session metadata and retrieved in the webhook handler.
+
+Step 4: Stripe processes payment and fires a webhook to the backend. Backend calls Codelocks API to generate a timed NetCode. Backend sends the PIN to the customer via Twilio SMS.
+
+Step 5: Customer types PIN on the lock keypad. Lock verifies PIN using its internal clock algorithm. No wifi needed.
+
+Step 6: Customer puts belongings in, closes door. Door auto-latches.
+
+Step 7: Customer returns within rental window, types same PIN. Lock opens. Customer retrieves items.
+
+Step 8: Rental window expires. PIN automatically stops working.
+
+---
+
+7. EARLY RETRIEVAL
+
+Customers can retrieve their items at any time before the rental window expires. The same PIN reopens the locker. The system does not require the customer to signal that they are done.
+
+For the pilot, early return does not trigger an immediate locker reset. The locker remains in "occupied" state until expiry, then resets automatically. This avoids building a check-out flow entirely. If a customer leaves early and someone else wants that locker, they wait for expiry or the operator resets it manually via Supabase.
+
+---
+
+8. TECHNICAL ARCHITECTURE
+
+8.1 Tech stack
+
+Lock hardware: Codelocks KL1200 NetCode. Purpose-built for locker rental, battery powered (50,000 openings per charge), outdoor rated, no wifi needed.
+
+Code generation: Codelocks NetCode API. Time-based algorithm synced between lock and cloud at setup. Codes expire automatically. REST API.
+
+Payments: Stripe Checkout. Phone number is collected on the booking page before checkout and passed to Stripe as session metadata.
+
+SMS delivery: Twilio. Used for two purposes: (1) sending PIN codes to customers, (2) sending failure alerts to the operator.
+
+Database: Supabase (Postgres). The Supabase Table Editor serves as the operator's admin interface for viewing rentals, filtering by status, and manually updating records. No custom dashboard is built for Version 1.
+
+Hosting: Vercel or Railway. Simple deployment, automatic SSL.
+
+8.2 System layers
+
+Layer 1 - Physical hardware:
+- Codelocks KL1200 NetCode lock mounted on each locker door
+- Battery powered, 2x AAA cells, no wiring or wifi required
+- Each lock is initialized once via the Codelocks Connect Portal, syncing its internal clock and algorithm
+- Unique locker ID embedded in QR code sticker on each door
+- Customers identify available lockers visually (open door = available, closed door = occupied)
+
+Layer 2 - Backend application:
+- Receives Stripe webhook after successful payment
+- Retrieves customer phone number from Stripe session metadata (collected on booking page before checkout). If missing despite this safeguard, marks rental as "failed" and alerts operator via SMS with customer email from Stripe so operator can contact them
+- Calls Codelocks API with: locker ID, start time, duration
+- If Codelocks API fails, retries up to 3 times for transient errors. If still failing after 3 attempts, marks rental as "failed" and alerts operator via SMS with all relevant details (locker ID, customer phone, Stripe payment ID)
+- Codelocks returns a 7-digit NetCode
+- Stores rental session in database
+- Sends code to customer via Twilio SMS
+
+Layer 3 - Customer-facing booking page:
+- Mobile-optimized, no app download required
+- QR code URL is an absolute URL encoding the locker ID (e.g. https://lockervan.com/locker/B07)
+- Collects customer phone number (required, validated before checkout)
+- Shows duration options and pricing
+- Phone number is passed to Stripe as session metadata; Stripe Checkout handles payment and email collection
+- Confirmation page shows: locker number, PIN code, rental start time, rental expiry time, and a note that the code was also sent via text message
+- Confirmation page includes a note: "Your code usually arrives via text within 30 seconds."
+
+8.3 Stripe webhook handler
+
+This is the most technically sensitive part of the system. Payment confirmation does not happen in real time in the same browser session. Stripe sends an async webhook to the server after processing.
+
+The webhook handler must:
+- Verify the Stripe webhook signature (prevents fake payment events)
+- Be idempotent: use stripe_payment_id (the payment_intent ID) as the idempotency key. Before generating a NetCode, check if a rental record with that payment_intent already exists in Supabase. If it does, skip code generation and return the existing code. Enforce this with a unique constraint on stripe_payment_id in the rentals table.
+- Respond within 5 seconds or Stripe will retry
+- Check that customer phone number is present. If missing, follow the failure alert path described above.
+- Handle Codelocks API failure with retry logic (up to 3 attempts), then alert operator via SMS if all retries fail.
+
+8.4 Operator failure alerts
+
+When the system cannot complete a rental (Codelocks API failure after retries, or missing phone number), it sends the operator an SMS via Twilio containing:
+- Alert type (code generation failed / missing phone number)
+- Locker ID
+- Customer phone number (if available)
+- Customer email (from Stripe)
+- Stripe payment ID
+- Timestamp
+
+The operator can then manually generate a code via the Codelocks Connect Portal and contact the customer directly, or use the master key as a last resort.
+
+8.5 Operator "dashboard" (Supabase Table Editor)
+
+No custom dashboard is built for Version 1. The operator uses the Supabase Table Editor directly to:
+- View all lockers and their current status (available / occupied / expired / failed)
+- Filter active rentals by status, location, or expiry time
+- See customer contact info for support cases
+- Manually update rental status if needed (e.g. resetting a locker after manual intervention)
+- View daily rental counts and revenue (using amount_cents field)
+
+The operator is given a Supabase account with appropriate access to the rentals table.
+
+8.6 Supabase Auth
+
+The operator's Supabase account is secured with email/password authentication via Supabase Auth. Row Level Security is enabled on the database to prevent unauthorized access. HTTPS is enforced by default via Vercel/Railway.
+
+---
+
+9. DATA MODEL
+
+Core rentals table:
+
+locker_id - Unique identifier matching the QR code on the door (e.g. B07)
+customer_phone - Phone number for SMS delivery of PIN code
+customer_email - Email address collected by Stripe (stored for reference, not used for delivery in V1)
+netcode - The 7-digit PIN sent to the customer
+rental_start - Timestamp when rental began (moment of payment)
+rental_expiry - Timestamp when PIN expires
+duration_hours - Selected duration (1, 3, or 5)
+stripe_payment_id - Unique. Used as idempotency key and for support lookups
+amount_cents - Payment amount in cents (e.g. 300 for $3.00)
+status - active / completed / expired / failed
+delivery_status - sent / failed / pending
+location_id - Which physical site (e.g. Willows Beach, Mayfair Mall)
+
+---
+
+10. KNOWN LIMITATIONS AND PENDING ITEMS
+
+No-show handling: If a customer pays but never enters the code, the locker remains marked as "occupied" for the full rental window. The lock is offline and cannot report whether it was actually opened. At pilot scale this is accepted as a known limitation. For future consideration: a dashboard indicator flagging rentals where the code was generated but no issues have been reported after an extended period.
+
+Items left after expiry (REQUIREMENT PENDING): When a rental expires, the PIN stops working, but the customer's belongings may still be inside the locker. If the system marks the locker as "available" and a new customer pays for it, they could potentially access someone else's items. This depends on how the Codelocks lock physically behaves after code expiry. The operator must clarify with the Codelocks vendor: (1) Can a NetCode be configured so the locker can only be opened but not re-locked after expiry, preventing a new rental until manual clearance? (2) Does the lock have any sensor indicating whether items are inside? This must be resolved before pilot launch.
+
+Phone number collection: Phone number is now collected on the booking page before Stripe Checkout, making it mandatory. This eliminates the previous limitation where Stripe's phone_number_collection field could be skipped by customers. The phone number is passed to Stripe as session metadata and retrieved in the webhook handler.
+
+Offline lock state: The lock does not communicate back to the system. All status tracking (occupied, expired, available) is based on timestamps in the database, not on physical lock state. The system's view of locker availability is an approximation.
+
+---
+
+11. PHASED ROADMAP
+
+Phase 1 - Pilot: 2-3 locations, 12-18 lockers. Full automated flow. Supabase Table Editor as admin interface. Success criteria: consistent daily rentals, system runs without manual intervention, demand validated.
+
+Phase 2 - Expansion: Additional locations. Multiple locker sizes. Pre-booking capability. Improved admin tooling with analytics. Location-level QR code showing available lockers at a site. Success criteria: revenue per location justifies hardware cost within 90 days.
+
+Phase 3 - Product: Public-facing location map. API for venue partners. Potential white-label for other operators. Success criteria: repeatable playbook for new location onboarding.
+
+---
+
+12. OPEN QUESTIONS
+
+- Locker cabinet sourcing: Codelocks supplies the lock mechanism only. Cabinet/enclosure sourced separately by the operator.
+- Location agreements: parks and public spaces will require permits or revenue-sharing agreements. Operator's responsibility.
+- Codelocks API tier: confirm which plan includes API access and at what monthly cost.
+- Items left after expiry: pending vendor clarification (see Section 10).
+- Domain registration: lockervan.com (or chosen domain) must be registered. Needed for QR code URLs and hosting.
+
+---
+
+13. SETUP DEPENDENCIES
+
+Before development begins:
+- Domain registered and DNS configured
+- Stripe account created and webhook endpoint configured
+- Twilio account created with a Canadian phone number for SMS
+- Supabase project created
+- Codelocks vendor account with API access confirmed
+- At least one lock initialized via Codelocks Connect Portal for testing
+
+---
+
+LockerVan PRD v3.0 | April 2026
