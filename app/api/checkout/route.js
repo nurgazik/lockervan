@@ -40,6 +40,7 @@ export async function POST(request) {
           quantity: 1,
         },
       ],
+      allow_promotion_codes: true,
       metadata: {
         locker_id: lockerId,
         customer_phone: phone,
