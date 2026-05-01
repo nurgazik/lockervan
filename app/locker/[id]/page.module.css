@@ -53,20 +53,35 @@
   margin-bottom: 8px;
 }
 
-.phoneInput {
-  width: 100%;
-  padding: 14px 16px;
-  font-size: 1.05rem;
+.phoneRow {
+  display: flex;
+  align-items: center;
   border: 2px solid #c8e6d8;
   border-radius: 12px;
-  outline: none;
-  transition: border-color 0.2s;
   background: #f7fcf9;
-  font-family: inherit;
+  transition: border-color 0.2s;
 }
 
-.phoneInput:focus {
+.phoneRow:focus-within {
   border-color: #34c77b;
+}
+
+.phonePrefix {
+  padding: 14px 0 14px 16px;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #3d5a4e;
+  user-select: none;
+}
+
+.phoneInput {
+  flex: 1;
+  padding: 14px 16px 14px 8px;
+  font-size: 1.05rem;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: inherit;
 }
 
 .options {

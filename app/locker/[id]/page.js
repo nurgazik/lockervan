@@ -14,16 +14,21 @@ export default function LockerPage({ params }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  function formatPhone(digits) {
+    if (digits.length <= 3) return digits;
+    if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
+  }
+
   function handlePhoneChange(e) {
-    const value = e.target.value.replace(/[^\d+\-() ]/g, "");
-    setPhone(value);
+    const digits = e.target.value.replace(/\D/g, "").slice(0, 10);
+    setPhone(digits);
     if (error) setError("");
   }
 
   async function handleCheckout() {
-    const digits = phone.replace(/\D/g, "");
-    if (digits.length < 10) {
-      setError("Please enter a valid phone number.");
+    if (phone.length !== 10) {
+      setError("Please enter your 10-digit phone number.");
       return;
     }
     if (selected === null) {
@@ -41,7 +46,7 @@ export default function LockerPage({ params }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           lockerId: id,
-          phone,
+          phone: `+1${phone}`,
           durationHours: option.hours,
           priceInCents: option.price,
         }),
@@ -62,7 +67,7 @@ export default function LockerPage({ params }) {
     }
   }
 
-  const isReady = phone.replace(/\D/g, "").length >= 10 && selected !== null;
+  const isReady = phone.length === 10 && selected !== null;
 
   return (
     <div className={styles.container}>
@@ -77,15 +82,18 @@ export default function LockerPage({ params }) {
             Phone Number
           </label>
           <p className={styles.hint}>Your locker code will be sent via text.</p>
-          <input
-            id="phone"
-            type="tel"
-            className={styles.phoneInput}
-            placeholder="+1 (250) 555-0123"
-            value={phone}
-            onChange={handlePhoneChange}
-            autoComplete="tel"
-          />
+          <div className={styles.phoneRow}>
+            <span className={styles.phonePrefix}>+1</span>
+            <input
+              id="phone"
+              type="tel"
+              className={styles.phoneInput}
+              placeholder="(250) 555-0123"
+              value={formatPhone(phone)}
+              onChange={handlePhoneChange}
+              autoComplete="tel"
+            />
+          </div>
         </div>
 
         <div className={styles.section}>
