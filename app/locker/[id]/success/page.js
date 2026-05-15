@@ -8,6 +8,7 @@ export default function SuccessPage({ params, searchParams }) {
   const { session_id } = use(searchParams);
   const [rental, setRental] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [polling, setPolling] = useState(false);
 
   useEffect(() => {
     if (!session_id) {
@@ -15,13 +16,40 @@ export default function SuccessPage({ params, searchParams }) {
       return;
     }
 
-    fetch(`/api/rental-status?session_id=${session_id}`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.rental) setRental(data.rental);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
+    let cancelled = false;
+    let attempts = 0;
+    const maxAttempts = 15;
+
+    async function poll() {
+      try {
+        const res = await fetch(`/api/rental-status?session_id=${session_id}`);
+        const data = await res.json();
+
+        if (cancelled) return;
+
+        if (data.rental?.netcode) {
+          setRental(data.rental);
+          setLoading(false);
+          setPolling(false);
+        } else if (attempts < maxAttempts) {
+          attempts++;
+          setLoading(false);
+          setPolling(true);
+          setTimeout(poll, 2000);
+        } else {
+          setLoading(false);
+          setPolling(false);
+        }
+      } catch {
+        if (!cancelled) {
+          setLoading(false);
+          setPolling(false);
+        }
+      }
+    }
+
+    poll();
+    return () => { cancelled = true; };
   }, [session_id]);
 
   if (loading) {
@@ -66,9 +94,13 @@ export default function SuccessPage({ params, searchParams }) {
               </div>
             </div>
           </div>
+        ) : polling ? (
+          <div className={styles.pending}>
+            <p>Your code is being generated...</p>
+          </div>
         ) : (
           <div className={styles.pending}>
-            <p>Your code is being generated and will be sent to your phone via text message.</p>
+            <p>Your code will be sent to your phone via text message.</p>
           </div>
         )}
 
